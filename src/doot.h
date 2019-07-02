@@ -1,7 +1,11 @@
 #include <stdbool.h>
 
-#define resolution_width 256
+#define resolution_width 400
 #define resolution_height 256
+#define MAX_CHARACTER_SECTOR_NUM 16
+#define RAD_TO_DEG 57.29577951308232
+#define DEG_TO_RAD 0.017453292519943
+
 //#define info_dump 0
 
 void RenderScene(void);
@@ -14,6 +18,7 @@ void ProcessMouseMovement(int, int);
 
 float absf(float);
 float dist(float, float, float, float);
+void intersect(float, float, float, float, float, float, float, float, float*, float*);
 
 typedef struct sector sector;
 typedef struct color color;
@@ -58,6 +63,7 @@ struct sector
     int n_walls;
     wall* walls[16];
     color colors[6];
+    character* characters[MAX_CHARACTER_SECTOR_NUM];
 };
 
 struct v_ray_slice
@@ -75,10 +81,14 @@ struct slice
 {
 //    int x, y;
     bool draw_middle;
+    bool hit_character;
 
     float x1, y1, p_x, p_y;
     float length;
     float angle;
+
+    character *chara;
+    float hit_x, hit_y, hit_tx, hit_dangle, hit_length, hit_height;
 
     int floor_height, ceiling_height;
 
@@ -89,8 +99,10 @@ struct slice
 struct character
 {
     sector* sector_p;
-    float pos_x, pos_y;
+    float pos_x, pos_y, x21, y21, x22, y22;
     float angle;
     float height;
+    int radius;
     int texture;
+    bool is_player;
 };

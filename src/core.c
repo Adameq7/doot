@@ -25,17 +25,41 @@ extern float wall_bound;
 extern sector s1, s2, s3, s4, s5;
 extern color c1, c2, c3, c4;
 
-extern character* player;
+extern character *player;
+extern character *enemy;
 
 extern int window_width, window_height;
 extern unsigned char image_buffer[];
 extern unsigned char* textures[];
+extern unsigned char* char_textures[];
 extern v_ray v_rays[resolution_width];
 
 bool keys[256];
 
 float disp_amount = 0.0f;
 float text_corr = 0.0f;
+
+void CleanSector(sector *s)
+{
+  for(int i = 0; i < MAX_CHARACTER_SECTOR_NUM; i++)
+    s->characters[i] = NULL;
+}
+
+void AddCharacter(sector *s, character *chara)
+{
+  for(int i = 0; i < MAX_CHARACTER_SECTOR_NUM; i++)
+  {
+    if(s->characters[i] == NULL)
+    {
+      s->characters[i] = chara;
+      return;
+    }
+  }
+
+  printf("not enough space in sector\n");
+
+  return;
+}
 
 void KeyUp(unsigned char c, int x, int y)
 {
@@ -60,6 +84,31 @@ float min(float a, float b)
 float absf(float a)
 {
     return a > 0 ? a : -a;
+}
+
+void intersect(float x11, float y11,
+                float x12, float y12, 
+                float x21, float y21, 
+                float x22, float y22,
+                float *x, float *y)
+{
+  float a1, a2, b1, b2, d_x, d_y;
+
+  d_x = x12 - x11;
+  d_y = y12 - y11;
+  a1 = d_x != 0 ? d_y / d_x : 0;
+  b1 = y11 - a1 * x11; 
+
+  d_x = x22 - x21;
+  d_y = y22 - y21;
+  a2 = d_x != 0 ? d_y / d_x : 0;
+  b2 = y21 - a2 * x21; 
+
+  if(a1 - a2 == 0)
+    return;
+
+  *x = (b2 - b1) / (a1 - a2);
+  *y = *x * a1 + b1;  
 }
 
 void ProcessKeys();
@@ -117,24 +166,24 @@ void switch_sector(character* player, int wall_index, sector* s, int a, bool ver
                         player->sector_p = w->s;
 }
 
-void ProcessCharacter(character* player)
+void ProcessCharacter(character* chara)
 {
-    if(player->height > player->sector_p->floor_height)
-        player->height -= gravity;
+    if(chara->height > chara->sector_p->floor_height)
+        chara->height -= gravity;
 
-    if(player->height < player->sector_p->floor_height)
-        player->height = player->sector_p->floor_height;
+    if(chara->height < chara->sector_p->floor_height)
+        chara->height = chara->sector_p->floor_height;
 
-    if(player->angle >= 360)
-        player->angle -= 360;
-    if(player->angle < 0)
-        player->angle += 360;
+    if(chara->angle >= 360)
+        chara->angle -= 360;
+    if(chara->angle < 0)
+        chara->angle += 360;
 
-    sector* s = player->sector_p;
+    sector* s = chara->sector_p;
     wall* w;
     int wall_index;
 
-    for(int i = 0; i < player->sector_p->n_walls; i++)
+    for(int i = 0; i < chara->sector_p->n_walls; i++)
     {
         w = s->walls[i];
 
@@ -151,30 +200,30 @@ void ProcessCharacter(character* player)
 
         if(a == 0)
         {
-            if(w->angle == 270.0 && player->pos_x < 0)
+            if(w->angle == 270.0 && chara->pos_x < 0)
             {
                 if(w->s != NULL)
-                    switch_sector(player, i, s, a, 1);
+                    switch_sector(chara, i, s, a, 1);
                 else
-                    player->pos_x = 0;
+                    chara->pos_x = 0;
             }
 
-            if(w->angle == 90.0 && player->pos_x > w->x1)
+            if(w->angle == 90.0 && chara->pos_x > w->x1)
             {
                 if(w->s != NULL)
-                    switch_sector(player, i, s, a, 1);
+                    switch_sector(chara, i, s, a, 1);
                 else
-                    player->pos_x = w->x1;
+                    chara->pos_x = w->x1;
             }
         }
 
         if(d_x != 0 && ((w->angle > 270) || (w->angle <= 90)))
         {
-            if(player->pos_y > a * player->pos_x + b)
+            if(chara->pos_y > a * chara->pos_x + b)
             {
                 if(w->s != NULL)
                 {
-                    switch_sector(player, i, s, a, 0);
+                    switch_sector(chara, i, s, a, 0);
 
                     break;
                 }
@@ -182,26 +231,26 @@ void ProcessCharacter(character* player)
                 if(a != 0)
                 {
                     a2 = -1.0 / a;
-                    b2 = player->pos_y - a2 * player->pos_x;
+                    b2 = chara->pos_y - a2 * chara->pos_x;
 
                     t_x = (b2 - b) / (a - a2);
 
-                    player->pos_x = t_x;
-                    player->pos_y = a * t_x + b;
+                    chara->pos_x = t_x;
+                    chara->pos_y = a * t_x + b;
                 }
                 else
                 {
-                    player->pos_y = a * player->pos_x + b;
+                    chara->pos_y = a * chara->pos_x + b;
                 }
             }
         }
         if(d_x != 0 && ((w->angle <= 270) && (w->angle > 90)))
         {
-            if(player->pos_y < a * player->pos_x + b)
+            if(chara->pos_y < a * chara->pos_x + b)
             {
                     if(w->s != NULL)
                     {
-                        switch_sector(player, i, s, a, 0);
+                        switch_sector(chara, i, s, a, 0);
 
                         break;
                     }
@@ -209,25 +258,35 @@ void ProcessCharacter(character* player)
                 if(a != 0)
                 {
                     a2 = -1.0 / a;
-                    b2 = player->pos_y - a2 * player->pos_x;
+                    b2 = chara->pos_y - a2 * chara->pos_x;
 
                     t_x = (b2 - b) / (a - a2);
 
-                    player->pos_x = t_x;
-                    player->pos_y = a * t_x + b;
+                    chara->pos_x = t_x;
+                    chara->pos_y = a * t_x + b;
                 }
                 else
                 {
-                    player->pos_y = a * player->pos_x + b;
+                    chara->pos_y = a * chara->pos_x + b;
                 }
             }
         }
     }
+
+  AddCharacter(chara->sector_p, chara);
+
+  if(chara != player)
+  {
+    chara->x22 = chara->pos_x + (chara->radius) * sin((player->angle - 90) * (M_PI / 180));
+    chara->x21 = chara->pos_x + (chara->radius) * sin((player->angle + 90) * (M_PI / 180));
+    chara->y22 = chara->pos_y + (chara->radius) * cos((player->angle - 90) * (M_PI / 180));
+    chara->y21 = chara->pos_y + (chara->radius) * cos((player->angle + 90) * (M_PI / 180));
+  }
 }
 
 void CreateView()
 {
-    camera_height = player->height + 32;
+    camera_height = player->height;
 
     sector* s = player->sector_p;
 
@@ -270,7 +329,7 @@ void CreateView()
         x1 = player->pos_x + sin(player->angle * M_PI / 180) * cur_disp;
         y1 = player->pos_y + cos(player->angle * M_PI / 180) * cur_disp;
 
-        s = player->sector_p;
+        s = player->sector_p; 
 
         int n_slices = 0;
         slice slices[16];
@@ -301,6 +360,62 @@ void CreateView()
             p_y = 0;
 
             found_wall = false;
+
+            slices[n_slices].hit_character = 0;
+
+            for(int k = 0; k < MAX_CHARACTER_SECTOR_NUM; k++)
+            {
+              if(s->characters[k] == NULL)
+                break;
+
+              if(s->characters[k] != player)
+              {
+//                printf("found %p\n", s->characters[i]);
+
+                float ehx, ehy;
+
+                intersect(x1, y1, x2, y2, 
+                          s->characters[k]->pos_x, s->characters[k]->pos_y,
+                          s->characters[k]->x21, s->characters[k]->y21,
+                          &ehx, &ehy);
+
+//                printf("%f %f %d\n", ehx, ehy, i);
+
+                if(dist(s->characters[k]->pos_x, s->characters[k]->pos_y, ehx, ehy) < s->characters[k]->radius)
+                {
+//                  printf("hit");
+//                  printf("hit %p %d\n", s->characters[k], k);
+
+                  float ct_x = sqrt(absf(ehx - s->characters[k]->x21) * 
+                                    absf(ehx - s->characters[k]->x21) +
+                                    absf(ehy - s->characters[k]->y21) *
+                                    absf(ehy - s->characters[k]->y21));
+
+                  float angle2 = atan2((x1 - ehx), (y1 - ehy));
+                  float angle_temp = angle * DEG_TO_RAD;
+                  
+//                  float dangle = absf(angle - ((180 / M_PI) * atan2((x1 - s->characters[k]->pos_x), (y1 - s->characters[k]->pos_y))));
+                  float dangle = min((2 * M_PI) - absf(angle_temp - angle2), absf(angle_temp - angle2));
+
+//                  dangle = 180 - dangle;
+
+//                  printf("%f %f %f\n", angle_temp, angle2, dangle);
+
+                  slices[n_slices].hit_character = (absf(dangle) > M_PI / 2);
+                  slices[n_slices].chara = s->characters[k];
+                  slices[n_slices].hit_x = ehx;
+                  slices[n_slices].hit_y = ehy;
+                  slices[n_slices].hit_tx = ct_x;
+                  slices[n_slices].hit_dangle = dangle;
+                  slices[n_slices].hit_length = length + dist(x1, y1, s->characters[k]->pos_x, s->characters[k]->pos_y);
+                  slices[n_slices].hit_height = s->characters[k]->height + delta_height;
+                }
+
+//                printf("\n");
+
+                break;
+              }
+            }
 
             if(info_dump)
                 printf("angle: %f\n",angle);
@@ -480,6 +595,56 @@ void CreateView()
 
             int x = tv - proj_size + 0.5f;
             int y = tv + proj_size + wall_height * 8 * (room_height - 1) / dist; 
+
+            //-----------------------------------------
+
+//            printf("%d\n", i);
+//            printf("-\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n", 
+//                   n_length,dist,proj_size,camera_offset,tv,x,y);
+
+            if(slices[k].hit_character)
+            {
+              float n_length_char = /*cos(absf(player->angle - slices[0].angle) * M_PI / 180) */ slices[k].hit_length / 12;
+
+              float dist_char = (1 * (n_length_char > 0.01 ? n_length_char : 0.01));
+              float proj_size_char = (float)resolution_height / dist_char;
+              int camera_offset_char = 8 * (camera_height - 32) / dist_char;
+
+              int tv_char = camera_offset_char + 8 * (float)(slices[k].hit_height) / dist_char + (float)resolution_height / 2;
+
+              int x_char = tv_char - proj_size_char + 0.5f;
+              int y_char = tv_char + proj_size_char + wall_height * 8 / dist_char; 
+
+//              float ratio_char = (y - x) / slices[k].hit_height;
+              float ratio_char = 64.0 / (y_char - x_char);
+
+//              x_char = x_char > 0 ? x_char : 0;
+//              y_char = y_char < resolution_height ? y_char : resolution_height - 1;
+              slices[k].hit_tx = (slices[k].hit_tx >= 0 ? slices[k].hit_tx : 0);
+              slices[k].hit_tx = (slices[k].hit_tx < 64 ? slices[k].hit_tx : 63);
+
+//              z = x_char;
+
+              for(int j = (x_char > 0 ? x_char : 0); j < (y_char < resolution_height ? y_char : resolution_height - 1); j++)
+              {
+                  if(!is_drawn[j])
+                  {
+                      is_drawn[j] = true;
+
+                      image_buffer[(resolution_width * j + i) * 4 + 0] = char_textures[slices[k].chara->texture][((int)slices[k].hit_tx + (int)((j - x_char) * ratio_char) * 64) * 3 + 0];
+                      image_buffer[(resolution_width * j + i) * 4 + 1] = char_textures[slices[k].chara->texture][((int)slices[k].hit_tx + (int)((j - x_char) * ratio_char) * 64) * 3 + 1];
+                      image_buffer[(resolution_width * j + i) * 4 + 2] = char_textures[slices[k].chara->texture][((int)slices[k].hit_tx + (int)((j - x_char) * ratio_char) * 64) * 3 + 2];
+                      image_buffer[(resolution_width * j + i) * 4 + 3] = 255;
+
+//                      z += ratio_char;
+                  }
+              }
+
+//            printf("---\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n", 
+//                   n_length_char,dist_char,proj_size_char,camera_offset_char,tv_char,x_char,y_char);
+//              printf("%d %d %f %d\n", x_char, y_char, ratio_char, i);
+            }
+                        
 
             if(info_dump)
             {
@@ -673,6 +838,10 @@ void ProcessGame()
 {
     ProcessKeys();
 
+    CleanSector(&s1);
+    CleanSector(&s2);
+
+    ProcessCharacter(enemy);
     ProcessCharacter(player);
 
     CreateView();

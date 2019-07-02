@@ -39,12 +39,13 @@ wall w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12;
 color c1, c2, c3, c4;
 //sector sectors[128];
 
-character* player;
+character *player, *enemy;
 v_ray v_rays[resolution_width];
 
 void PrepareGame()
 {
     player = (character*)malloc(sizeof(character));
+    enemy = (character*)malloc(sizeof(character));
 
     c1.r = 64;
     c1.g = 64;
@@ -62,7 +63,7 @@ void PrepareGame()
     textures[0] = SOIL_load_image("data/textures/floor.bmp", &wall_height, &wall_height, 0, SOIL_LOAD_RGB);
     textures[1] = SOIL_load_image("data/textures/grid.bmp", &wall_height, &wall_height, 0, SOIL_LOAD_RGB);
 
-    char_textures[0] = SOIL_load_image("char_1.bmp", &wall_height, &wall_height, 0, SOIL_LOAD_RGB);
+    char_textures[0] = SOIL_load_image("data/textures/char_1.bmp", &wall_height, &wall_height, 0, SOIL_LOAD_RGB);
 
     unsigned char temp1, temp2, temp3;
 
@@ -84,6 +85,12 @@ void PrepareGame()
                 textures[k][(wall_height - i - 1) * 3 * wall_height + j * 3 + 2] = temp3;
             }
         }
+
+    for(int i = 0; i < 16; i++)
+    {
+      s1.characters[i] = NULL;
+      s2.characters[i] = NULL;
+    }
 
     s1.width = 384;
     s1.height = 384;
@@ -262,6 +269,16 @@ void PrepareGame()
     player->sector_p = &s1;
     player->pos_x = 192;
     player->pos_y = 288;
+    player->is_player = 1;
+
+    enemy->height = 0;
+    enemy->angle = 0;
+    enemy->sector_p = &s1;
+    enemy->pos_x = 192;
+    enemy->pos_y = 192;
+    enemy->is_player = 0;
+    enemy->texture = 0;
+    enemy->radius = 32;
 }
 
 int main(int argc, char **argv)
