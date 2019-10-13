@@ -27,6 +27,7 @@ typedef struct slice slice;
 typedef struct wall wall;
 typedef struct v_ray v_ray;
 typedef struct v_ray_slice v_ray_slice;
+typedef struct character_slice character_slice;
 
 struct color
 {
@@ -59,7 +60,6 @@ struct sector
 
     color colors[6];
 */
-
     int n_walls;
     wall* walls[16];
     color colors[6];
@@ -77,6 +77,25 @@ struct v_ray
     v_ray_slice v_slices[2];
 };
 
+struct character
+{
+    sector* sector_p;
+    float pos_x, pos_y, x21, y21, x22, y22;
+    float angle;
+    float height;
+    int radius;
+    int texture;
+    float dist;
+    bool is_player;
+};
+
+struct character_slice
+{
+  character *chara;
+//  float dist;
+  float hit_x, hit_y, hit_tx, hit_dangle, hit_length, hit_height;
+};
+
 struct slice
 {
 //    int x, y;
@@ -87,22 +106,11 @@ struct slice
     float length;
     float angle;
 
-    character *chara;
-    float hit_x, hit_y, hit_tx, hit_dangle, hit_length, hit_height;
+    character_slice character_slices[MAX_CHARACTER_SECTOR_NUM];
+    int character_slices_ind;
 
     int floor_height, ceiling_height;
 
     char wall;
     sector* s;
-};
-
-struct character
-{
-    sector* sector_p;
-    float pos_x, pos_y, x21, y21, x22, y22;
-    float angle;
-    float height;
-    int radius;
-    int texture;
-    bool is_player;
 };

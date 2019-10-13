@@ -26,7 +26,7 @@ extern sector s1, s2, s3, s4, s5;
 extern color c1, c2, c3, c4;
 
 extern character *player;
-extern character *enemy;
+extern character *enemy, *enemy2;
 
 extern int window_width, window_height;
 extern unsigned char image_buffer[];
@@ -38,6 +38,11 @@ bool keys[256];
 
 float disp_amount = 0.0f;
 float text_corr = 0.0f;
+
+int CompCharacterSlice(const void *a, const void *b)
+{
+  return ((character_slice*)a)->hit_length > ((character_slice*)b)->hit_length;
+}
 
 void CleanSector(sector *s)
 {
@@ -87,10 +92,10 @@ float absf(float a)
 }
 
 void intersect(float x11, float y11,
-                float x12, float y12, 
-                float x21, float y21, 
-                float x22, float y22,
-                float *x, float *y)
+               float x12, float y12, 
+               float x21, float y21, 
+               float x22, float y22,
+               float *x, float *y)
 {
   float a1, a2, b1, b2, d_x, d_y;
 
@@ -334,6 +339,8 @@ void CreateView()
         int n_slices = 0;
         slice slices[16];
 
+        memset(&slices, 0, sizeof(slices));
+
         float min_x, max_x, min_y, max_y, delta_angle;
 
         if(info_dump)
@@ -401,19 +408,27 @@ void CreateView()
 
 //                  printf("%f %f %f\n", angle_temp, angle2, dangle);
 
-                  slices[n_slices].hit_character = (absf(dangle) > M_PI / 2);
-                  slices[n_slices].chara = s->characters[k];
-                  slices[n_slices].hit_x = ehx;
-                  slices[n_slices].hit_y = ehy;
-                  slices[n_slices].hit_tx = ct_x;
-                  slices[n_slices].hit_dangle = dangle;
-                  slices[n_slices].hit_length = length + dist(x1, y1, s->characters[k]->pos_x, s->characters[k]->pos_y);
-                  slices[n_slices].hit_height = s->characters[k]->height + delta_height;
+                  slices[n_slices].character_slices[slices[n_slices].character_slices_ind].chara = s->characters[k];
+                  slices[n_slices].character_slices[slices[n_slices].character_slices_ind].hit_length = length + dist(x1, y1, s->characters[k]->pos_x, s->characters[k]->pos_y);
+                  slices[n_slices].character_slices[slices[n_slices].character_slices_ind].hit_x = ehx;
+                  slices[n_slices].character_slices[slices[n_slices].character_slices_ind].hit_y = ehy;
+                  slices[n_slices].character_slices[slices[n_slices].character_slices_ind].hit_tx = ct_x;
+                  slices[n_slices].character_slices[slices[n_slices].character_slices_ind].hit_dangle = dangle;
+//                  slices[n_slices].hit_length = length + dist(x1, y1, s->characters[k]->pos_x, s->characters[k]->pos_y);
+                  slices[n_slices].character_slices[slices[n_slices].character_slices_ind].hit_height = s->characters[k]->height + delta_height;
+
+                  slices[n_slices].character_slices_ind++;
+
+                  if(absf(dangle) > M_PI / 2)
+                  {
+                    slices[n_slices].hit_character = 1;
+//                    break;
+                  }
                 }
 
 //                printf("\n");
 
-                break;
+//                break;
               }
             }
 
@@ -602,49 +617,55 @@ void CreateView()
 //            printf("-\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n", 
 //                   n_length,dist,proj_size,camera_offset,tv,x,y);
 
-            if(slices[k].hit_character)
+            if(slices[k].character_slices_ind > 1)
+              qsort(&slices[k].character_slices, slices[k].character_slices_ind, sizeof(character_slice), CompCharacterSlice);
+
+            for(int l = 0; l < slices[k].character_slices_ind; l++)
             {
-              float n_length_char = /*cos(absf(player->angle - slices[0].angle) * M_PI / 180) */ slices[k].hit_length / 12;
-
-              float dist_char = (1 * (n_length_char > 0.01 ? n_length_char : 0.01));
-              float proj_size_char = (float)resolution_height / dist_char;
-              int camera_offset_char = 8 * (camera_height - 32) / dist_char;
-
-              int tv_char = camera_offset_char + 8 * (float)(slices[k].hit_height) / dist_char + (float)resolution_height / 2;
-
-              int x_char = tv_char - proj_size_char + 0.5f;
-              int y_char = tv_char + proj_size_char + wall_height * 8 / dist_char; 
-
-//              float ratio_char = (y - x) / slices[k].hit_height;
-              float ratio_char = 64.0 / (y_char - x_char);
-
-//              x_char = x_char > 0 ? x_char : 0;
-//              y_char = y_char < resolution_height ? y_char : resolution_height - 1;
-              slices[k].hit_tx = (slices[k].hit_tx >= 0 ? slices[k].hit_tx : 0);
-              slices[k].hit_tx = (slices[k].hit_tx < 64 ? slices[k].hit_tx : 63);
-
-//              z = x_char;
-
-              for(int j = (x_char > 0 ? x_char : 0); j < (y_char < resolution_height ? y_char : resolution_height - 1); j++)
+              if(slices[k].hit_character)
               {
-                  if(!is_drawn[j])
-                  {
-                      is_drawn[j] = true;
+                float n_length_char = /*cos(absf(player->angle - slices[0].angle) * M_PI / 180) */ slices[k].character_slices[l].hit_length / 12;
 
-                      image_buffer[(resolution_width * j + i) * 4 + 0] = char_textures[slices[k].chara->texture][((int)slices[k].hit_tx + (int)((j - x_char) * ratio_char) * 64) * 3 + 0];
-                      image_buffer[(resolution_width * j + i) * 4 + 1] = char_textures[slices[k].chara->texture][((int)slices[k].hit_tx + (int)((j - x_char) * ratio_char) * 64) * 3 + 1];
-                      image_buffer[(resolution_width * j + i) * 4 + 2] = char_textures[slices[k].chara->texture][((int)slices[k].hit_tx + (int)((j - x_char) * ratio_char) * 64) * 3 + 2];
-                      image_buffer[(resolution_width * j + i) * 4 + 3] = 255;
+                float dist_char = (1 * (n_length_char > 0.01 ? n_length_char : 0.01));
+                float proj_size_char = (float)resolution_height / dist_char;
+                int camera_offset_char = 8 * (camera_height - 32) / dist_char;
 
-//                      z += ratio_char;
-                  }
+                int tv_char = camera_offset_char + 8 * (float)(slices[k].character_slices[l].hit_height) / dist_char + (float)resolution_height / 2;
+
+                int x_char = tv_char - proj_size_char + 0.5f;
+                int y_char = tv_char + proj_size_char + wall_height * 8 / dist_char; 
+
+  //              float ratio_char = (y - x) / slices[k].hit_height;
+                float ratio_char = 64.0 / (y_char - x_char);
+
+  //              x_char = x_char > 0 ? x_char : 0;
+  //              y_char = y_char < resolution_height ? y_char : resolution_height - 1;
+                slices[k].character_slices[l].hit_tx = (slices[k].character_slices[l].hit_tx >= 0 ? slices[k].character_slices[l].hit_tx : 0);
+                slices[k].character_slices[l].hit_tx = (slices[k].character_slices[l].hit_tx < 64 ? slices[k].character_slices[l].hit_tx : 63);
+
+  //              z = x_char;
+
+                for(int j = (x_char > 0 ? x_char : 0); j < (y_char < resolution_height ? y_char : resolution_height - 1); j++)
+                {
+                    if(!is_drawn[j])
+                    {
+                        is_drawn[j] = true;
+
+                        image_buffer[(resolution_width * j + i) * 4 + 0] = char_textures[slices[k].character_slices[l].chara->texture][((int)slices[k].character_slices[l].hit_tx + (int)((j - x_char) * ratio_char) * 64) * 3 + 0];
+                        image_buffer[(resolution_width * j + i) * 4 + 1] = char_textures[slices[k].character_slices[l].chara->texture][((int)slices[k].character_slices[l].hit_tx + (int)((j - x_char) * ratio_char) * 64) * 3 + 1];
+                        image_buffer[(resolution_width * j + i) * 4 + 2] = char_textures[slices[k].character_slices[l].chara->texture][((int)slices[k].character_slices[l].hit_tx + (int)((j - x_char) * ratio_char) * 64) * 3 + 2];
+                        image_buffer[(resolution_width * j + i) * 4 + 3] = 255;
+
+  //                      z += ratio_char;
+                    }
+                }
+
+  //            printf("---\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n", 
+  //                   n_length_char,dist_char,proj_size_char,camera_offset_char,tv_char,x_char,y_char);
+  //              printf("%d %d %f %d\n", x_char, y_char, ratio_char, i);
               }
-
-//            printf("---\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n", 
-//                   n_length_char,dist_char,proj_size_char,camera_offset_char,tv_char,x_char,y_char);
-//              printf("%d %d %f %d\n", x_char, y_char, ratio_char, i);
+              
             }
-                        
 
             if(info_dump)
             {
@@ -842,6 +863,7 @@ void ProcessGame()
     CleanSector(&s2);
 
     ProcessCharacter(enemy);
+    ProcessCharacter(enemy2);
     ProcessCharacter(player);
 
     CreateView();
@@ -884,7 +906,7 @@ void ProcessKeys()
         }
         if(keys['z'])
         {
-            printf("%f %f %ld\n", player->pos_x, player->pos_y, player->sector_p);
+            printf("%f %f %p\n", player->pos_x, player->pos_y, player->sector_p);
         }
         if(keys['o'])
         {

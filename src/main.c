@@ -39,13 +39,14 @@ wall w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12;
 color c1, c2, c3, c4;
 //sector sectors[128];
 
-character *player, *enemy;
+character *player, *enemy, *enemy2;
 v_ray v_rays[resolution_width];
 
 void PrepareGame()
 {
     player = (character*)malloc(sizeof(character));
-    enemy = (character*)malloc(sizeof(character));
+    enemy  = (character*)malloc(sizeof(character));
+    enemy2 = (character*)malloc(sizeof(character));
 
     c1.r = 64;
     c1.g = 64;
@@ -279,6 +280,15 @@ void PrepareGame()
     enemy->is_player = 0;
     enemy->texture = 0;
     enemy->radius = 32;
+ 
+    enemy2->height = 0;
+    enemy2->angle = 0;
+    enemy2->sector_p = &s1;
+    enemy2->pos_x = 256;
+    enemy2->pos_y = 200;
+    enemy2->is_player = 0;
+    enemy2->texture = 0;
+    enemy2->radius = 32;
 }
 
 int main(int argc, char **argv)
